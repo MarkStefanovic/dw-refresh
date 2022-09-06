@@ -1,0 +1,5 @@
+{
+  "connection-string": "postgresql://postgres@localhost/test",
+  "max-connections": 3,
+  "schema-name": "dw"
+}
