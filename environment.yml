@@ -1,7 +1,7 @@
 # to create new env: conda env create --file environment.yml
 # to update env: conda env update --file environment.yml --prune
 # remove env: conda env remove -n ENV_NAME
-name: dw-refresh
+name: dwr
 dependencies:
 - python>=3.10
 - pip

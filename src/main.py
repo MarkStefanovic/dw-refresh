@@ -1,28 +1,38 @@
+import argparse
 import asyncio
 import datetime
 import logging
-import pathlib
 import sys
 
 from loguru import logger
 
-from src import config, db, fs
+from src import adapter, service
 
 
-async def main(*, incremental: bool = True, config_path: pathlib.Path = fs.get_config_path()) -> None:
-    await db.refresh_dw(
+# noinspection PyShadowingNames
+async def refresh(*, incremental: bool = True) -> None:
+    config_path = adapter.fs.get_config_path()
+    await service.refresh(
         incremental=incremental,
-        max_connections=config.get_max_connections(config_path=config_path),
-        connection_string=config.get_connection_string(config_path=config_path),
-        schema=config.get_schema_name(config_path=config_path),
+        max_connections=adapter.config.get_max_connections(config_path=config_path),
+        connection_string=adapter.config.get_connection_string(config_path=config_path),
+        schema=adapter.config.get_schema_name(config_path=config_path),
     )
 
 
-if __name__ == '__main__':
-    fs.get_log_folder().mkdir(exist_ok=True)
+async def check() -> None:
+    config_path = adapter.fs.get_config_path()
+    await service.check(
+        max_connections=adapter.config.get_max_connections(config_path=config_path),
+        connection_string=adapter.config.get_connection_string(config_path=config_path),
+        schema=adapter.config.get_schema_name(config_path=config_path),
+    )
 
-    logger.add(fs.get_log_folder() / "info.log", rotation="5 MB", retention="7 days", level=logging.INFO)
-    logger.add(fs.get_log_folder() / "error.log", rotation="5 MB", retention="7 days", level=logging.ERROR)
+if __name__ == '__main__':
+    adapter.fs.get_log_folder().mkdir(exist_ok=True)
+
+    logger.add(adapter.fs.get_log_folder() / "info.log", rotation="5 MB", retention="7 days", level="INFO")
+    logger.add(adapter.fs.get_log_folder() / "error.log", rotation="5 MB", retention="7 days", level="ERROR")
 
     if getattr(sys, "frozen", False):
         logger.add(sys.stderr, format="{time} {level} {message}", level=logging.DEBUG)
@@ -30,16 +40,25 @@ if __name__ == '__main__':
     try:
         logger.info("Starting dw-refresh...")
 
-        if len(sys.argv) == 1:
-            incr = True
-        elif len(sys.argv) == 2:
-            incr = bool(int(sys.argv[1]))
-        else:
-            raise Exception(f"dw-refresh accepts 1 argument (incremental = 0 or 1), but {len(sys.argv)} arguments were provided.")
+        parser = argparse.ArgumentParser(description="Utilities to manage refreshes of the data-warehouse.")
+        subparser = parser.add_subparsers(dest="command", required=True)
+
+        check_parser = subparser.add_parser("check", help="Run test procedures against the data-warehouse.")
+
+        refresh_parser = subparser.add_parser("refresh", help="Refresh the data-warehouse.")
+        refresh_parser.add_argument("--incremental", type=int, choices=(0, 1), default=1, required=True, help="run a full refresh (0) or an incremental refresh (1).")
+
+        args = parser.parse_args(sys.argv[1:])
 
         start = datetime.datetime.now()
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-        asyncio.run(main(incremental=incr))
+        if args.command == "check":
+            logger.info("Running check...")
+            asyncio.run(check())
+        else:
+            incremental = bool(args.incremental)
+            logger.info(f"Running refresh({incremental})...")
+            asyncio.run(refresh(incremental=incremental))
         seconds = (datetime.datetime.now() - start).total_seconds()
         logger.info(f"dw-refresh completed in {seconds} seconds.")
         sys.exit(0)

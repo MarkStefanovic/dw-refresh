@@ -3,7 +3,7 @@ import json
 import pathlib
 import typing
 
-from src import fs
+from src.adapter import fs
 
 __all__ = ("get_connection_string", "get_max_connections", "get_schema_name")
 

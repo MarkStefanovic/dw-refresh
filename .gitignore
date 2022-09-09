@@ -140,6 +140,7 @@ dmypy.json
 cython_debug/
 
 /scratch
+/logs
 .idea
 config.json
 app.ico
