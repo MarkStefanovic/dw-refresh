@@ -1,31 +1,62 @@
+import datetime
+import traceback
+
 import asyncpg
-import loguru as loguru
+from loguru import logger
 
 from src.adapter import db
+from src.service.run_procs import run_procs_matching_pattern
 
 __all__ = ("check",)
 
 
-async def check(*, max_connections: int, schema: str, connection_string: str) -> None:
+async def check(
+    *,
+    max_connections: int,
+    schema: str,
+    connection_string: str,
+    days_logs_to_keep: int,
+) -> None:
+    start_time = datetime.datetime.now()
+
     pool = await asyncpg.create_pool(connection_string)
-    await _run_procs_matching_pattern(pool=pool, schema=schema, max_connections=max_connections, like="check_refresh\_%")
 
+    initial_context = {
+        "max_connections": max_connections,
+        "schema": schema,
+    }
 
-async def _run_proc(*, pool: asyncpg.Pool, schema: str, stored_proc: str) -> None:
-    async with pool.acquire(timeout=10) as con:
-        loguru.logger.info(f"Starting {schema}.{stored_proc}...")
-        await con.execute(f"CALL {schema}.{stored_proc}();")
-        loguru.logger.info(f"{schema}.{stored_proc} completed successfully.")
+    batch_id = await db.batch_started(pool=pool, context=initial_context)
 
+    try:
+        await db.cleanup(pool=pool, days_logs_to_keep=days_logs_to_keep)
 
-async def _run_procs(*, pool: asyncpg.Pool, schema: str, stored_procs: set[str], max_connections: int) -> None:
-    tasks = [
-        _run_proc(pool=pool, schema=schema, stored_proc=stored_proc)
-        for stored_proc in stored_procs
-    ]
-    await db.gather_with_limited_concurrency(max_connections, *tasks)
+        await run_procs_matching_pattern(
+            pool=pool,
+            batch_id=batch_id,
+            schema=schema,
+            max_connections=max_connections,
+            like=r"check_refresh\_%",
+            proc_args={},
+        )
 
+        execution_millis = int((datetime.datetime.now() - start_time).total_seconds() * 1000)
 
-async def _run_procs_matching_pattern(*, pool: asyncpg.Pool, schema: str, like: str, max_connections: int) -> None:
-    procs = await db.get_proc_names_by_pattern(pool=pool, schema=schema, like=like)
-    await _run_procs(pool=pool, schema=schema, stored_procs=procs, max_connections=max_connections)
+        await db.batch_succeeded(
+            pool=pool,
+            batch_id=batch_id,
+            execution_millis=execution_millis,
+            context=initial_context,
+        )
+    except Exception as e:
+        try:
+            await db.batch_failed(
+                pool=pool,
+                batch_id=batch_id,
+                error_message=f"{e!s}\n{traceback.format_exc()}",
+                context=initial_context,
+            )
+        except Exception as e:
+            logger.exception(e)
+            raise
+

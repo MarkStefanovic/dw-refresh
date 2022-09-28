@@ -7,6 +7,7 @@ __all__ = (
     "batch_failed",
     "batch_started",
     "batch_succeeded",
+    "cleanup",
     "gather_with_limited_concurrency",
     "get_proc_names_by_pattern",
     "proc_failed",
@@ -32,17 +33,31 @@ async def batch_failed(
         )
 
 
-async def batch_started(*, pool: asyncpg.Pool) -> int:
+async def batch_started(*, pool: asyncpg.Pool, context: dict[str, typing.Hashable]) -> int:
     async with pool.acquire(timeout=_DEFAULT_TIMEOUT) as con:
-        return await con.fetchval("SELECT * FROM dwr.batch_started() AS bid;")
+        return await con.fetchval(
+            "SELECT * FROM dwr.batch_started(p_context := $1) AS bid;",
+            context,
+        )
 
 
-async def batch_succeeded(*, pool: asyncpg.Pool, batch_id: int, execution_millis: int) -> int:
+async def batch_succeeded(
+    *,
+    pool: asyncpg.Pool,
+    batch_id: int,
+    execution_millis: int,
+    context: dict[str, typing.Hashable],
+) -> int:
     async with pool.acquire(timeout=_DEFAULT_TIMEOUT) as con:
         return await con.execute(
-            "CALL dwr.batch_succeeded (p_batch_id := $1, p_execution_millis := $2);",
-            batch_id, execution_millis,
+            "CALL dwr.batch_succeeded (p_batch_id := $1, p_execution_millis := $2, p_context := $3);",
+            batch_id, execution_millis, context,
         )
+
+
+async def cleanup(*, pool: asyncpg.Pool, days_logs_to_keep: int) -> None:
+    async with pool.acquire(timeout=_DEFAULT_TIMEOUT) as con:
+        return await con.execute("CALL dwr.cleanup (p_days_to_keep := $1);", days_logs_to_keep)
 
 
 async def gather_with_limited_concurrency(n: int, *tasks: asyncio.Task) -> tuple[asyncio.Future, ...]:
@@ -98,19 +113,31 @@ async def proc_failed(
         )
 
 
-async def proc_started(*, pool: asyncpg.Pool, batch_id: int, proc_name: str) -> int:
+async def proc_started(
+    *,
+    pool: asyncpg.Pool,
+    batch_id: int,
+    proc_name: str,
+    context: dict[str, typing.Hashable],
+) -> int:
     async with pool.acquire(timeout=_DEFAULT_TIMEOUT) as con:
         return await con.fetchval(
-            "SELECT * FROM dwr.proc_started(p_batch_id := $1, p_name := $2);",
-            batch_id, proc_name,
+            "SELECT * FROM dwr.proc_started(p_batch_id := $1, p_proc_name := $2, p_context := $3);",
+            batch_id, proc_name, context,
         )
 
 
-async def proc_succeeded(*, pool: asyncpg.Pool, proc_id: int, execution_millis: int) -> None:
+async def proc_succeeded(
+    *,
+    pool: asyncpg.Pool,
+    proc_id: int,
+    execution_millis: int,
+    context: dict[str, typing.Hashable],
+) -> None:
     async with pool.acquire(timeout=_DEFAULT_TIMEOUT) as con:
         await con.execute(
-            "CALL dwr.proc_succeeded(p_proc_id := $1, p_execution_millis := $2);",
-            proc_id, execution_millis,
+            "CALL dwr.proc_succeeded(p_proc_id := $1, p_execution_millis := $2, p_context := $3);",
+            proc_id, execution_millis, context,
         )
 
 
@@ -119,7 +146,11 @@ async def run_proc(
     pool: asyncpg.Pool,
     schema: str,
     proc_name: str,
-    incremental: bool,
+    proc_args: dict[str, typing.Hashable],
 ) -> None:
     async with pool.acquire(timeout=10) as con:
-        await con.execute(f"CALL {schema}.{proc_name}(p_incremental := $1);", incremental)
+        param_placeholders = ", ".join(
+            f"{param} := ${i}"
+            for i, param in enumerate(proc_args.keys(), start=1)
+        )
+        await con.execute(f"CALL {schema}.{proc_name}({param_placeholders});", *proc_args.values())

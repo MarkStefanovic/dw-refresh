@@ -10,22 +10,24 @@ from src import adapter, service
 
 
 # noinspection PyShadowingNames
-async def refresh(*, incremental: bool = True) -> None:
+async def refresh(*, incremental: bool = True, days_logs_to_keep: int = 3) -> None:
     config_path = adapter.fs.get_config_path()
     await service.refresh(
         incremental=incremental,
         max_connections=adapter.config.get_max_connections(config_path=config_path),
         connection_string=adapter.config.get_connection_string(config_path=config_path),
         schema=adapter.config.get_schema_name(config_path=config_path),
+        days_logs_to_keep=days_logs_to_keep,
     )
 
 
-async def check() -> None:
+async def check(*, days_logs_to_keep: int = 3) -> None:
     config_path = adapter.fs.get_config_path()
     await service.check(
         max_connections=adapter.config.get_max_connections(config_path=config_path),
         connection_string=adapter.config.get_connection_string(config_path=config_path),
         schema=adapter.config.get_schema_name(config_path=config_path),
+        days_logs_to_keep=days_logs_to_keep,
     )
 
 if __name__ == '__main__':
@@ -44,9 +46,11 @@ if __name__ == '__main__':
         subparser = parser.add_subparsers(dest="command", required=True)
 
         check_parser = subparser.add_parser("check", help="Run test procedures against the data-warehouse.")
+        check_parser.add_argument("--days-logs-to-keep", type=int, required=True, default=3)
 
         refresh_parser = subparser.add_parser("refresh", help="Refresh the data-warehouse.")
-        refresh_parser.add_argument("--incremental", type=int, choices=(0, 1), default=1, required=True, help="run a full refresh (0) or an incremental refresh (1).")
+        refresh_parser.add_argument("--full", action="store_true", help="Run a full refresh.")
+        refresh_parser.add_argument("--days-logs-to-keep", type=int, required=True, default=3)
 
         args = parser.parse_args(sys.argv[1:])
 
