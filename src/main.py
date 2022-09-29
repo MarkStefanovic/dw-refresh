@@ -60,7 +60,7 @@ if __name__ == '__main__':
             logger.info("Running check...")
             asyncio.run(check())
         else:
-            incremental = bool(args.incremental)
+            incremental = not args.full
             logger.info(f"Running refresh({incremental})...")
             asyncio.run(refresh(incremental=incremental))
         seconds = (datetime.datetime.now() - start).total_seconds()

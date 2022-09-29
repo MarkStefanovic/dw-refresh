@@ -53,12 +53,12 @@ async def refresh(
 
             execution_millis = int((datetime.datetime.now() - start_time).total_seconds() * 1000)
 
-            await db.batch_succeeded(
-                pool=pool,
-                batch_id=batch_id,
-                execution_millis=execution_millis,
-                context=initial_context | {"pattern": pattern}
-            )
+        await db.batch_succeeded(
+            pool=pool,
+            batch_id=batch_id,
+            execution_millis=execution_millis,
+            context=initial_context | {"pattern": pattern}
+        )
     except Exception as e:
         try:
             await db.batch_failed(

@@ -1,4 +1,5 @@
 import asyncio
+import json
 import typing
 
 import asyncpg
@@ -27,16 +28,28 @@ async def batch_failed(
     context: dict[str, typing.Hashable],
 ) -> int:
     async with pool.acquire(timeout=_DEFAULT_TIMEOUT) as con:
+        await con.set_type_codec(
+            "jsonb",
+            encoder=json.dumps,
+            decoder=json.loads,
+            schema='pg_catalog'
+        )
         return await con.execute(
-            "CALL dwr.batch_failed(p_batch_id := $1, p_error_message := $2, p_context := $3);",
+            "CALL dwr.batch_failed(p_batch_id := $1, p_error_message := $2, p_context := $3::JSONB);",
             batch_id, error_message, context,
         )
 
 
 async def batch_started(*, pool: asyncpg.Pool, context: dict[str, typing.Hashable]) -> int:
     async with pool.acquire(timeout=_DEFAULT_TIMEOUT) as con:
+        await con.set_type_codec(
+            "jsonb",
+            encoder=json.dumps,
+            decoder=json.loads,
+            schema='pg_catalog'
+        )
         return await con.fetchval(
-            "SELECT * FROM dwr.batch_started(p_context := $1) AS bid;",
+            "SELECT * FROM dwr.batch_started(p_context := $1::JSONB) AS bid;",
             context,
         )
 
@@ -49,8 +62,14 @@ async def batch_succeeded(
     context: dict[str, typing.Hashable],
 ) -> int:
     async with pool.acquire(timeout=_DEFAULT_TIMEOUT) as con:
+        await con.set_type_codec(
+            "jsonb",
+            encoder=json.dumps,
+            decoder=json.loads,
+            schema='pg_catalog'
+        )
         return await con.execute(
-            "CALL dwr.batch_succeeded (p_batch_id := $1, p_execution_millis := $2, p_context := $3);",
+            "CALL dwr.batch_succeeded (p_batch_id := $1, p_execution_millis := $2, p_context := $3::JSONB);",
             batch_id, execution_millis, context,
         )
 
@@ -107,8 +126,14 @@ async def proc_failed(
     context: dict[str, typing.Hashable],
 ) -> None:
     async with pool.acquire(timeout=_DEFAULT_TIMEOUT) as con:
+        await con.set_type_codec(
+            "jsonb",
+            encoder=json.dumps,
+            decoder=json.loads,
+            schema='pg_catalog'
+        )
         await con.execute(
-            "CALL dwr.proc_failed(p_proc_id := $1, p_error_message := $2, p_context := $3);",
+            "CALL dwr.proc_failed(p_proc_id := $1, p_error_message := $2, p_context := $3::JSONB);",
             proc_id, error_message, context,
         )
 
@@ -121,8 +146,14 @@ async def proc_started(
     context: dict[str, typing.Hashable],
 ) -> int:
     async with pool.acquire(timeout=_DEFAULT_TIMEOUT) as con:
+        await con.set_type_codec(
+            "jsonb",
+            encoder=json.dumps,
+            decoder=json.loads,
+            schema='pg_catalog'
+        )
         return await con.fetchval(
-            "SELECT * FROM dwr.proc_started(p_batch_id := $1, p_proc_name := $2, p_context := $3);",
+            "SELECT * FROM dwr.proc_started(p_batch_id := $1, p_proc_name := $2, p_context := $3::JSONB);",
             batch_id, proc_name, context,
         )
 
@@ -135,8 +166,14 @@ async def proc_succeeded(
     context: dict[str, typing.Hashable],
 ) -> None:
     async with pool.acquire(timeout=_DEFAULT_TIMEOUT) as con:
+        await con.set_type_codec(
+            "jsonb",
+            encoder=json.dumps,
+            decoder=json.loads,
+            schema='pg_catalog'
+        )
         await con.execute(
-            "CALL dwr.proc_succeeded(p_proc_id := $1, p_execution_millis := $2, p_context := $3);",
+            "CALL dwr.proc_succeeded(p_proc_id := $1, p_execution_millis := $2, p_context := $3::JSONB);",
             proc_id, execution_millis, context,
         )
 
