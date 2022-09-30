@@ -7,8 +7,8 @@
     "^refresh_l_.*",
     "^refresh_sal_.*",
     "^refresh_s_.*",
-    "^refresh_.*_.*_dim$",
-    "^refresh_.*_.*_fact$"
+    "^refresh_.*_dim$",
+    "^refresh_.*_fact$"
   ],
   "check-refresh-proc-name-patterns": [
     "^check_refresh_.*"
