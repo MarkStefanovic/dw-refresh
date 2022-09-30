@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 import typing
 
 import asyncpg
@@ -79,7 +80,10 @@ async def cleanup(*, pool: asyncpg.Pool, days_logs_to_keep: int) -> None:
         return await con.execute("CALL dwr.cleanup (p_days_to_keep := $1);", days_logs_to_keep)
 
 
-async def gather_with_limited_concurrency(n: int, *tasks: asyncio.Task) -> tuple[asyncio.Future, ...]:
+async def gather_with_limited_concurrency(
+    n: int,
+    *tasks: asyncio.Task[typing.Coroutine[typing.Any, typing.Any, None]],
+) -> tuple[asyncio.Future[typing.Any], ...]:
     semaphore = asyncio.Semaphore(n)
 
     async def wrap_task(task):
@@ -93,12 +97,12 @@ async def get_proc_names_by_pattern(
     *,
     pool: asyncpg.Pool,
     schema: str,
-    like: str,
+    pattern: str,
 ) -> set[str]:
     async with pool.acquire(timeout=10) as con:
         result = await con.fetch(
             """
-            SELECT
+            SELECT DISTINCT
                p.proname as sp_name
             FROM pg_proc p
             LEFT JOIN pg_namespace n
@@ -110,12 +114,13 @@ async def get_proc_names_by_pattern(
             WHERE
                n.nspname ILIKE $1
                AND p.prokind = 'p'
-               AND p.proname ILIKE $2
-            ORDER BY
-                   sp_name
-           """, schema, like
+           """, schema, pattern
         )
-        return {row[0] for row in result}
+        proc_names = {row[0] for row in result}
+        return {
+            proc_name for proc_name in proc_names
+            if re.match(pattern, proc_name, flags=re.IGNORECASE)
+        }
 
 
 async def proc_failed(

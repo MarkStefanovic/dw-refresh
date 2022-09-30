@@ -16,16 +16,16 @@ async def run_procs_matching_pattern(
     batch_id: int,
     schema: str,
     like: str,
-    max_connections: int,
+    concurrent_procs: int,
     proc_args: dict[str, typing.Hashable],
 ) -> None:
-    procs = await db.get_proc_names_by_pattern(pool=pool, schema=schema, like=like)
+    procs = await db.get_proc_names_by_pattern(pool=pool, schema=schema, pattern=like)
     await _run_procs(
         pool=pool,
         batch_id=batch_id,
         schema=schema,
         stored_procs=procs,
-        max_connections=max_connections,
+        concurrent_procs=concurrent_procs,
         proc_args=proc_args,
     )
 
@@ -85,7 +85,7 @@ async def _run_procs(
     batch_id: int,
     schema: str,
     stored_procs: set[str],
-    max_connections: int,
+    concurrent_procs: int,
     proc_args: dict[str, typing.Hashable],
 ) -> None:
     tasks = [
@@ -99,4 +99,4 @@ async def _run_procs(
         for stored_proc in stored_procs
     ]
 
-    await db.gather_with_limited_concurrency(max_connections, *tasks)
+    await db.gather_with_limited_concurrency(concurrent_procs, *tasks)  # type: ignore

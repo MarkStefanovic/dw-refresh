@@ -1,5 +1,16 @@
 {
   "connection-string": "postgresql://postgres@localhost/test",
-  "max-connections": 3,
-  "schema-name": "dw"
+  "schema-name": "dw",
+  "refresh-proc-name-patterns": [
+    "^refresh_p_.*",
+    "^refresh_h_.*",
+    "^refresh_l_.*",
+    "^refresh_sal_.*",
+    "^refresh_s_.*",
+    "^refresh_.*_.*_dim$",
+    "^refresh_.*_.*_fact$"
+  ],
+  "check-refresh-proc-name-patterns": [
+    "^check_refresh_.*"
+  ]
 }
