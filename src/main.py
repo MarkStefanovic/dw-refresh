@@ -1,7 +1,6 @@
 import argparse
 import asyncio
 import datetime
-import logging
 import sys
 
 from loguru import logger
@@ -35,11 +34,9 @@ async def check(*, concurrent_procs: int, days_logs_to_keep: int = 3) -> None:
 if __name__ == '__main__':
     adapter.fs.get_log_folder().mkdir(exist_ok=True)
 
+    logger.add(sys.stdout, level="DEBUG")
     logger.add(adapter.fs.get_log_folder() / "info.log", rotation="5 MB", retention="7 days", level="INFO")
     logger.add(adapter.fs.get_log_folder() / "error.log", rotation="5 MB", retention="7 days", level="ERROR")
-
-    if getattr(sys, "frozen", False):
-        logger.add(sys.stderr, format="{time} {level} {message}", level=logging.DEBUG)
 
     try:
         logger.info("Starting dw-refresh...")
