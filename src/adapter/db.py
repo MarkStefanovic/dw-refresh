@@ -114,7 +114,8 @@ async def get_proc_names_by_pattern(
             WHERE
                n.nspname ILIKE $1
                AND p.prokind = 'p'
-           """, schema, pattern
+            """,
+            schema,
         )
         proc_names = {row[0] for row in result}
         return {

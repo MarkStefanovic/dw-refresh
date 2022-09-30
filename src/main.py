@@ -31,6 +31,7 @@ async def check(*, concurrent_procs: int, days_logs_to_keep: int = 3) -> None:
         check_refresh_proc_name_patterns=adapter.config.get_check_refresh_proc_name_patterns(config_path=config_path),
     )
 
+
 if __name__ == '__main__':
     adapter.fs.get_log_folder().mkdir(exist_ok=True)
 
@@ -57,29 +58,27 @@ if __name__ == '__main__':
 
         start = datetime.datetime.now()
 
-        loop = asyncio.new_event_loop()
-        try:
-            if args.command == "check":
-                logger.info("Running check...")
-                loop.run_until_complete(
-                    check(
-                        days_logs_to_keep=args.days_logs_to_keep,
-                        concurrent_procs=args.concurrent_procs,
-                    )
+        if sys.platform == "win32":
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+        if args.command == "check":
+            logger.info("Running check...")
+            asyncio.run(
+                check(
+                    days_logs_to_keep=args.days_logs_to_keep,
+                    concurrent_procs=args.concurrent_procs,
                 )
-            else:
-                incremental = not args.full
-                logger.info(f"Running refresh({incremental})...")
-                loop.run_until_complete(
-                    refresh(
-                        incremental=incremental,
-                        days_logs_to_keep=args.days_logs_to_keep,
-                        concurrent_procs=args.concurrent_procs,
-                    )
+            )
+        else:
+            incremental = not args.full
+            logger.info(f"Running refresh({incremental})...")
+            asyncio.run(
+                refresh(
+                    incremental=incremental,
+                    days_logs_to_keep=args.days_logs_to_keep,
+                    concurrent_procs=args.concurrent_procs,
                 )
-        except:  # noqa
-            loop.close()
-            raise
+            )
         seconds = (datetime.datetime.now() - start).total_seconds()
         logger.info(f"dw-refresh completed in {seconds} seconds.")
         sys.exit(0)

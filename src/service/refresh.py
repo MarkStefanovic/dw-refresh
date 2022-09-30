@@ -56,20 +56,18 @@ async def refresh(
                 context=initial_context,
             )
         except Exception as e:
-            try:
-                await db.batch_failed(
-                    pool=pool,
-                    batch_id=batch_id,
-                    error_message=f"{e!s}\n{traceback.format_exc()}",
-                    context={
-                        "incremental": incremental,
-                        "max_connections": concurrent_procs,
-                        "schema": schema,
-                    },
-                )
-            except Exception as e:
-                logger.exception(e)
-                raise
+            logger.exception(e)
+            await db.batch_failed(
+                pool=pool,
+                batch_id=batch_id,
+                error_message=f"{e!s}\n{traceback.format_exc()}",
+                context={
+                    "incremental": incremental,
+                    "max_connections": concurrent_procs,
+                    "schema": schema,
+                },
+            )
+            raise
     except:  # noqa
         await asyncio.wait_for(pool.close(), 10)
         raise
